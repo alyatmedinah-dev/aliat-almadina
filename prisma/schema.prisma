@@ -1,0 +1,360 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  MANAGER
+  EMPLOYEE
+  MARKETING
+  RECEPTION
+}
+
+enum PropertyType {
+  VILLA
+  APARTMENT
+  LAND
+  BUILDING
+  SHOP
+  OFFICE
+  WAREHOUSE
+}
+
+enum PropertyPurpose {
+  SALE
+  RENT
+}
+
+enum PropertyStatus {
+  READY
+  UNDER_CONSTRUCTION
+  RENTED
+  SOLD
+}
+
+enum ContractType {
+  SALE
+  RENT
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING
+}
+
+enum ClientStatus {
+  NEW
+  CONTACTED
+  INTERESTED
+  NEGOTIATING
+  CLOSED
+  LOST
+}
+
+enum DealType {
+  SALE
+  RENT
+  BOTH
+}
+
+enum RentalStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  SUCCESS
+  ERROR
+  PAYMENT_DUE
+  CONTRACT_EXPIRY
+}
+
+model User {
+  id          String    @id @default(cuid())
+  name        String
+  email       String    @unique
+  password    String
+  role        UserRole  @default(EMPLOYEE)
+  phone       String?
+  avatar      String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  notifications Notification[]
+  blogPosts     BlogPost[]
+  callLogs      CallLog[]
+  clientLeads   ClientLead[]
+
+  @@map("users")
+}
+
+model Owner {
+  id          String    @id @default(cuid())
+  name        String
+  phone       String
+  whatsapp    String?
+  email       String?
+  nationalId  String?   @unique
+  address     String?
+  notes       String?
+  dealType    DealType  @default(BOTH)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  properties  Property[]
+  contracts   Contract[]
+
+  @@map("owners")
+}
+
+model Property {
+  id            String          @id @default(cuid())
+  title         String
+  description   String?
+  type          PropertyType
+  purpose       PropertyPurpose
+  status        PropertyStatus  @default(READY)
+  price         Float
+  area          Float
+  rooms         Int?
+  bathrooms     Int?
+  floor         Int?
+  facing        String?
+  district      String?
+  city          String          @default("المدينة المنورة")
+  address       String?
+  lat           Float?
+  lng           Float?
+  featured      Boolean         @default(false)
+  views         Int             @default(0)
+  ownerId       String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  owner         Owner?          @relation(fields: [ownerId], references: [id])
+  images        PropertyImage[]
+  videos        PropertyVideo[]
+  pdfs          PropertyPDF[]
+  amenities     PropertyAmenity[]
+  contracts     Contract[]
+  rentals       Rental[]
+  clientLeads   ClientLead[]
+
+  @@map("properties")
+}
+
+model PropertyImage {
+  id          String    @id @default(cuid())
+  propertyId  String
+  url         String
+  publicId    String
+  isMain      Boolean   @default(false)
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("property_images")
+}
+
+model PropertyVideo {
+  id          String    @id @default(cuid())
+  propertyId  String
+  url         String
+  publicId    String?
+  type        String    @default("upload")
+  createdAt   DateTime  @default(now())
+
+  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("property_videos")
+}
+
+model PropertyPDF {
+  id          String    @id @default(cuid())
+  propertyId  String
+  url         String
+  publicId    String?
+  name        String
+  createdAt   DateTime  @default(now())
+
+  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("property_pdfs")
+}
+
+model PropertyAmenity {
+  id          String    @id @default(cuid())
+  propertyId  String
+  name        String
+
+  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("property_amenities")
+}
+
+model Client {
+  id            String        @id @default(cuid())
+  name          String
+  phone         String
+  whatsapp      String?
+  email         String?
+  budget        Float?
+  requirements  String?
+  status        ClientStatus  @default(NEW)
+  source        String?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  contracts     Contract[]
+  rentals       Rental[]
+  leads         ClientLead[]
+  callLogs      CallLog[]
+
+  @@map("clients")
+}
+
+model ClientLead {
+  id            String        @id @default(cuid())
+  clientId      String
+  propertyId    String?
+  status        ClientStatus  @default(NEW)
+  notes         String?
+  followUpDate  DateTime?
+  assignedToId  String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  client        Client        @relation(fields: [clientId], references: [id])
+  property      Property?     @relation(fields: [propertyId], references: [id])
+  assignedTo    User?         @relation(fields: [assignedToId], references: [id])
+
+  @@map("client_leads")
+}
+
+model Contract {
+  id              String          @id @default(cuid())
+  contractNumber  String          @unique
+  type            ContractType
+  status          ContractStatus  @default(PENDING)
+  propertyId      String
+  clientId        String
+  ownerId         String?
+  startDate       DateTime
+  endDate         DateTime
+  amount          Float
+  pdfUrl          String?
+  signature       String?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  property        Property        @relation(fields: [propertyId], references: [id])
+  client          Client          @relation(fields: [clientId], references: [id])
+  owner           Owner?          @relation(fields: [ownerId], references: [id])
+
+  @@map("contracts")
+}
+
+model Rental {
+  id            String        @id @default(cuid())
+  propertyId    String
+  clientId      String
+  amount        Float
+  paymentDay    Int
+  startDate     DateTime
+  endDate       DateTime
+  status        RentalStatus  @default(ACTIVE)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  property      Property      @relation(fields: [propertyId], references: [id])
+  client        Client        @relation(fields: [clientId], references: [id])
+  payments      RentalPayment[]
+
+  @@map("rentals")
+}
+
+model RentalPayment {
+  id          String    @id @default(cuid())
+  rentalId    String
+  amount      Float
+  dueDate     DateTime
+  paidDate    DateTime?
+  isPaid      Boolean   @default(false)
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  rental      Rental    @relation(fields: [rentalId], references: [id])
+
+  @@map("rental_payments")
+}
+
+model BlogPost {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  content     String
+  excerpt     String?
+  imageUrl    String?
+  imagePublicId String?
+  published   Boolean   @default(false)
+  authorId    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  author      User      @relation(fields: [authorId], references: [id])
+
+  @@map("blog_posts")
+}
+
+model CallLog {
+  id          String    @id @default(cuid())
+  clientId    String
+  userId      String
+  duration    Int?
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  client      Client    @relation(fields: [clientId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@map("call_logs")
+}
+
+model Notification {
+  id          String              @id @default(cuid())
+  userId      String
+  title       String
+  message     String
+  type        NotificationType    @default(INFO)
+  isRead      Boolean             @default(false)
+  relatedId   String?
+  createdAt   DateTime            @default(now())
+
+  user        User                @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model SiteSetting {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  value       String
+  updatedAt   DateTime  @updatedAt
+
+  @@map("site_settings")
+}
